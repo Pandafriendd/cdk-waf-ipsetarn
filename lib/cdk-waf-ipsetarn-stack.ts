@@ -1,18 +1,46 @@
-import * as sns from '@aws-cdk/aws-sns';
-import * as subs from '@aws-cdk/aws-sns-subscriptions';
-import * as sqs from '@aws-cdk/aws-sqs';
 import * as cdk from '@aws-cdk/core';
+import * as wafv2 from '@aws-cdk/aws-wafv2';
+import { CfnIPSet, CfnWebACL } from "@aws-cdk/aws-wafv2";
 
 export class CdkWafIpsetarnStack extends cdk.Stack {
-  constructor(scope: cdk.App, id: string, props?: cdk.StackProps) {
+  constructor(scope: cdk.Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
 
-    const queue = new sqs.Queue(this, 'CdkWafIpsetarnQueue', {
-      visibilityTimeout: cdk.Duration.seconds(300)
+    const testIpSet = new CfnIPSet(this, "IPSet", {
+      ipAddressVersion: "IPV4",
+      scope: "REGIONAL",
+      addresses: [
+        "1.2.3.4/32"
+      ],
     });
 
-    const topic = new sns.Topic(this, 'CdkWafIpsetarnTopic');
-
-    topic.addSubscription(new subs.SqsSubscription(queue));
+    const myTestWaf = new wafv2.CfnWebACL(this, 'CDNWAF' ,{
+      scope: 'REGIONAL',
+      defaultAction: {allow: {}},
+      rules: [
+        {
+          action: {
+            block: {}
+          },
+          priority: 1,
+          visibilityConfig: {
+            cloudWatchMetricsEnabled: false,
+            metricName: "Test",
+            sampledRequestsEnabled: false,
+          },
+          name: "MyTestRule1",
+          statement: {
+            ipSetReferenceStatement: {
+              arn: testIpSet.attrArn
+            }
+          },
+        },
+      ],
+      visibilityConfig: {
+        cloudWatchMetricsEnabled: false,
+        metricName: "Test",
+        sampledRequestsEnabled: false,
+      }
+    })
   }
 }
